@@ -37,3 +37,6 @@ htmlcov/
 # Challenge data and submission archives
 dataset/
 *.zip
+
+# Challenge-provided starter kit
+student_resource/
