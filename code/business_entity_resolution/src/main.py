@@ -3,18 +3,14 @@
 Pipeline entry point: data -> blocking -> matching -> output.
 Placeholder: currently loads the dataset and the output TSVs.
 
-Data is read from student_resource/dataset/ (gitignored, provided by the
-organisers); override with the BER_DATA_DIR environment variable.
+Data and output locations are resolved in config.py (local or Kaggle).
 """
 
-import os
 from pathlib import Path
 
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[3]
-DATA_DIR = Path(os.environ.get("BER_DATA_DIR", ROOT / "student_resource" / "dataset"))
-OUTPUT_DIR = ROOT / "output"
+from config import DATA_DIR, OUTPUT_DIR
 
 
 def read_tsv(path: Path) -> pd.DataFrame:

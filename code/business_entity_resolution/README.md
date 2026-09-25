@@ -17,8 +17,14 @@ python3 -m venv .venv
 
 Place the organiser-provided `student_resource/` folder (containing
 `dataset/train/` and `dataset/test/`) at the repository root. It is gitignored.
-To read data from elsewhere, set `BER_DATA_DIR` to a folder containing
-`train/` and `test/`.
+
+Paths are resolved by `src/config.py`, in this order:
+
+1. `BER_DATA_DIR` / `BER_OUTPUT_DIR` environment variables, if set
+   (`BER_DATA_DIR` must contain `train/` and `test/`)
+2. on Kaggle: the attached dataset containing `train/train_source1.tsv`
+   under `/kaggle/input`, and `/kaggle/working/output`
+3. locally: `student_resource/dataset/` and `output/` at the repository root
 
 ### 3. Run
 
