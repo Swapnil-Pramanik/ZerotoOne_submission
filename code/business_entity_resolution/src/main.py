@@ -1,20 +1,33 @@
 """Business Entity Resolution — Amazon ML Challenge 2026.
 
 Pipeline entry point: data -> blocking -> matching -> output.
-Placeholder: currently only loads the output TSVs.
+Placeholder: currently loads the dataset and the output TSVs.
+
+Data is read from student_resource/dataset/ (gitignored, provided by the
+organisers); override with the BER_DATA_DIR environment variable.
 """
 
+import os
 from pathlib import Path
 
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[3]
+DATA_DIR = Path(os.environ.get("BER_DATA_DIR", ROOT / "student_resource" / "dataset"))
 OUTPUT_DIR = ROOT / "output"
 
 
+def read_tsv(path: Path) -> pd.DataFrame:
+    return pd.read_csv(path, sep="\t", engine="pyarrow", dtype=str)
+
+
 def main() -> None:
-    matching_results = pd.read_csv(OUTPUT_DIR / "matching_results.tsv", sep="\t")
-    candidate_pairs = pd.read_csv(OUTPUT_DIR / "candidate_pairs.tsv", sep="\t")
+    for split in ("train", "test"):
+        for source in (1, 2, 3):
+            df = read_tsv(DATA_DIR / split / f"{split}_source{source}.tsv")
+            print(f"{split}_source{source}: {df.shape}")
+    matching_results = read_tsv(OUTPUT_DIR / "matching_results.tsv")
+    candidate_pairs = read_tsv(OUTPUT_DIR / "candidate_pairs.tsv")
     print(f"matching_results: {matching_results.shape}")
     print(f"candidate_pairs: {candidate_pairs.shape}")
 
