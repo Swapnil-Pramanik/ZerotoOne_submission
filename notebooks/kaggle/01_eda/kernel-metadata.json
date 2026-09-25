@@ -1,0 +1,15 @@
+{
+  "id": "swapnilpramanik/ber-01-eda",
+  "title": "BER 01 EDA",
+  "code_file": "../../01_eda.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": ["swapnilpramanik/ber-2026-challenge-data"],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}
