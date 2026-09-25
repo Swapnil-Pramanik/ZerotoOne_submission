@@ -1,3 +1,6 @@
 *.ipynb filter=nbstripout
 *.zpln filter=nbstripout
 *.ipynb diff=ipynb
+
+# executed EDA notebook: keep its outputs in git
+code/business_entity_resolution/notebooks/01_eda.ipynb -filter

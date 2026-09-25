@@ -1,0 +1,7 @@
+# Development-only tooling for the notebooks; the pipeline itself needs only ../requirements.txt.
+-r ../requirements.txt
+jupyterlab==4.6.4
+ipykernel==7.3.0
+matplotlib==3.11.2
+nbstripout==0.9.1
+kaggle==2.2.4
