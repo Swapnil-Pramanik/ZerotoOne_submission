@@ -1,0 +1,20 @@
+{
+  "id": "swapnilpramanik/ber-11-v7-llm",
+  "title": "BER 11 v7 LLM",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [
+    "swapnilpramanik/ber-2026-challenge-data"
+  ],
+  "competition_sources": [],
+  "kernel_sources": [
+    "swapnilpramanik/ber-08-v5"
+  ],
+  "model_sources": [],
+  "machine_shape": "NvidiaTeslaT4"
+}
