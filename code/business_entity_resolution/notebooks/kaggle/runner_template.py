@@ -3,7 +3,8 @@
 Recreates the local project snapshot bundled below, builds an isolated Python
 environment with the pinned requirements (so Kaggle's preinstalled packages
 never mix in), executes the notebook cell by cell, and saves the executed
-notebook to the output directory even when a cell fails.
+notebook to the output directory even when a cell fails. A telemetry thread
+records system RAM and per-GPU memory/utilisation to telemetry.csv throughout.
 """
 
 import json
@@ -24,6 +25,46 @@ VENV = WORK / "venv"
 KERNEL = "ber-venv"
 
 
+def start_telemetry(path: Path, every: int = 30, print_every: int = 300):
+    """Background thread: system RAM and per-GPU memory / utilisation every `every` seconds into a CSV,
+    with a summary line in the log every `print_every` seconds (Kaggle shows no live metrics via its CLI)."""
+    import threading
+
+    def ram():
+        info = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                k, v = line.split(":")
+                info[k] = int(v.split()[0]) / 1e6  # GB
+        return info["MemTotal"] - info["MemAvailable"], info["MemAvailable"]
+
+    def gpus():
+        try:
+            out = subprocess.run(["nvidia-smi", "--query-gpu=memory.used,utilization.gpu",
+                                  "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=10).stdout
+            return [tuple(float(x) for x in line.split(",")) for line in out.strip().splitlines()]
+        except Exception:
+            return []
+
+    def loop():
+        t0, last = time.time(), 0.0
+        with open(path, "w") as f:
+            f.write("seconds,ram_used_gb,ram_free_gb,gpu0_mem_mb,gpu0_util,gpu1_mem_mb,gpu1_util\n")
+            while True:
+                used, free = ram()
+                g = gpus() + [(float("nan"), float("nan"))] * 2
+                t = time.time() - t0
+                f.write(f"{t:.0f},{used:.2f},{free:.2f},{g[0][0]},{g[0][1]},{g[1][0]},{g[1][1]}\n")
+                f.flush()
+                if t - last >= print_every:
+                    last = t
+                    print(f"[telemetry {t:6.0f}s] ram used {used:.1f} GB, free {free:.1f} GB | "
+                          f"gpu0 {g[0][0]:.0f} MB {g[0][1]:.0f}% | gpu1 {g[1][0]:.0f} MB {g[1][1]:.0f}%", flush=True)
+                time.sleep(every)
+
+    threading.Thread(target=loop, daemon=True).start()
+
+
 def run(cmd, **kw):
     print("$", " ".join(map(str, cmd)), flush=True)
     subprocess.run(list(map(str, cmd)), check=True, **kw)
@@ -31,6 +72,8 @@ def run(cmd, **kw):
 
 def main():
     t0 = time.time()
+    OUT.mkdir(parents=True, exist_ok=True)
+    start_telemetry(OUT / "telemetry.csv")
     for rel, text in BUNDLE.items():
         path = REPO / rel
         path.parent.mkdir(parents=True, exist_ok=True)

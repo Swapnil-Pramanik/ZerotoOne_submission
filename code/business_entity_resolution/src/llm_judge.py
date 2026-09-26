@@ -5,8 +5,9 @@ The judge sees the S1 business, up to three records already confidently matched 
 same business. No text is generated: one forward pass per prompt, and the probability of
 "Yes" versus "No" as the next token is the score. One model copy runs per GPU.
 
-Models (open licences, <= 8B parameters): microsoft/Phi-3.5-mini-instruct (MIT, 3.8B) by
-default, Qwen/Qwen2.5-1.5B-Instruct (Apache-2.0, 1.5B) as a faster alternative.
+Models (open licences, <= 8B parameters): Qwen/Qwen2.5-1.5B-Instruct (Apache-2.0, 1.5B) by
+default — in the probe (notebooks/10_llm_probe) it scored AUC 0.919 on look-alike pairs at 44
+pairs/s on 2x T4; microsoft/Phi-3.5-mini-instruct (MIT, 3.8B) is the slower alternative (17/s).
 """
 
 import time
@@ -24,8 +25,8 @@ INSTRUCTION = ("You match business records from different databases. Records of 
 
 @dataclass
 class JudgeConfig:
-    model: str = "microsoft/Phi-3.5-mini-instruct"
-    batch: int = 32
+    model: str = "Qwen/Qwen2.5-1.5B-Instruct"   # probe: 44 pairs/s on 2x T4, AUC 0.919 on look-alike pairs
+    batch: int = 64
     max_len: int = 256
     max_siblings: int = 3
 
@@ -48,11 +49,18 @@ class Judge:
         self.devices = [f"cuda:{i}" for i in range(n_gpu)] or ["cpu"]
         dtype = torch.float16 if n_gpu else torch.float32
         self.models = [AutoModelForCausalLM.from_pretrained(cfg.model, dtype=dtype).to(d).eval() for d in self.devices]
-        self.yes = self._token_ids(["Yes", " Yes", "yes"])
-        self.no = self._token_ids(["No", " No", "no"])
+        yes, no = set(self._token_ids(["Yes", " Yes", "yes"])), set(self._token_ids(["No", " No", "no"]))
+        self.yes, self.no = sorted(yes - no), sorted(no - yes)
 
     def _token_ids(self, words):
-        return sorted({self.tok.encode(w, add_special_tokens=False)[0] for w in words})
+        """Ids of the word itself for each spelling: the *last* sub-token (SentencePiece tokenizers split
+        " Yes" into a bare space marker + "Yes"; a shared marker would make Yes and No cancel out)."""
+        ids = set()
+        for w in words:
+            enc = self.tok.encode(w, add_special_tokens=False)
+            if enc and self.tok.decode(enc[-1:]).strip():
+                ids.add(enc[-1])
+        return sorted(ids)
 
     def _chat(self, text: str) -> str:
         msgs = [{"role": "system", "content": INSTRUCTION}, {"role": "user", "content": text}]

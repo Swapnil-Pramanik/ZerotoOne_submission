@@ -12,9 +12,9 @@ assignment + F0.5 threshold → output**.
 | v3 | + France self-training (pseudo-labels, learned région aliases, France-only model) | n/a (no French labels) | pending |
 | v3 run | (single process) | 0.982 | — (ran out of RAM in the test phase) |
 | v4 | v3, test stage in a fresh process | pending | pending |
-| v5 | v3, both stages in own processes + hashed blocking keys (−~10 GB) | pending | pending |
+| v5 | v3, both stages in own processes + hashed blocking keys (−~10 GB) | 0.9813 | 0.971 |
 | v6 | + sibling stage 2, set selection, France address fix, int32 candidates, keys generated per chunk | pending (dev slice: stage 1 0.9838 → 0.9860) | pending |
-| v7 | + LLM judge (Phi-3.5-mini, MIT) on the hardest pairs of a finished run, France prioritised | pending | pending |
+| v7 | post-processing of v6: twin support + LLM judge (Qwen2.5-1.5B) on the hardest pairs, France prioritised; applied only if validation improves | pending | pending |
 
 ## How to reproduce
 
@@ -117,7 +117,7 @@ Built from train so that offline F0.5 reflects the test set:
 | Stage 1 | `matching.train` | LightGBM binary classifier, early-stopped on the validation fold; out-of-fold scores on fit rows; prediction aligns features by name |
 | Stage 2 (v6) | `stage2.py` | For pairs with stage-1 probability ≥ 0.01: sibling features (best name / address similarity and shared house number with the records stage 1 assigned to the entity, sibling count per source, siblings' best probability) and how that support ranks across the record's candidates; a second LightGBM re-scores them |
 | France (v3) | `france.py` | After test scoring: pseudo-labels on French candidates (best candidate ≥ 0.97 → positive; its other candidates and anything ≤ 0.03 → negative), French state aliases (département / city → S1 région) learned from the positives so the state feature works for France, a France-only LightGBM on the pseudo-labels blended 50/50 with the base model. Writes three test variants that differ only in France (see *Outputs*) |
-| LLM judge (v7) | `v7.py`, `llm_judge.py` | Post-processing of a finished run. Hard pairs only: each record's best candidate with an uncertain probability plus close second candidates, closest to the threshold first, 40% of the budget reserved for France (wider band). The LLM sees the business, up to 3 records already matched to it and the candidate; P(Yes) is combined with the base probability by a logistic regression fitted on the base run's validation cache (applied only if validation F0.5 improves), or — without a cache — only very confident flips |
+| Post-processing (v7) | `v7.py`, `llm_judge.py` | On a finished v6 run, without retraining. Rows that may change: each record's best / second candidate with probability in [0.02, 0.98]. **Twin support:** each such record's best look-alike among all other S2/S3 records (the pipeline's blocking, record against record) — real records come in twins, distractors are loners. **LLM judge** (Qwen2.5-1.5B-Instruct, Apache-2.0; chosen by the probe: AUC 0.919, 44 pairs/s) on the hardest subset only, 65% of the budget reserved for France: the business, up to 3 records already matched to it, and the candidate; P(Yes) vs P(No). Logistic-regression combiners (twins; twins + LLM) are fitted on the v6 validation cache and the best by validation macro F0.5 is applied, or none |
 | Decision | `pipeline.decide`, `stage2.select_sets` | Each S2/S3 record goes to its single best-scoring S1 entity; then either a global threshold (stage 1 or stage 2) or per-entity set selection by expected F0.5 (keep the top k records, k possibly 0) — whichever validates best |
 | Output | `data_io.write_id_lists` | One row per test S1 entity, comma-separated ids, empty when none |
 
@@ -137,8 +137,8 @@ Built from train so that offline F0.5 reflects the test set:
 | `src/evaluate.py` | Official macro F0.5 and blocking recall |
 | `src/france.py` | France self-training (pseudo-labels, state aliases, France model) |
 | `src/stage2.py` | Sibling features, stage-2 matrix, best-record assignment, per-entity set selection |
-| `src/llm_judge.py` | LLM judge: prompt with sibling context, next-token P(Yes) vs P(No), one model copy per GPU |
-| `src/v7.py` | v7 post-processing of a finished run: hard-pair selection (France share), LLM scoring, calibration, re-decision |
+| `src/llm_judge.py` | LLM judge: prompt with sibling context, next-token P(Yes) vs P(No) (word tokens only, none shared between Yes and No), one model copy per GPU |
+| `src/v7.py` | v7 post-processing of a finished run: re-score rows, twin features, hard-pair selection (France share), LLM scoring, validation-chosen combiner, re-decision |
 | `src/pipeline.py` | Validation scenario and diagnostics (per-country F0.5, false merges by distractor kind), neural stages (each guarded: a failure is logged and skipped), test prediction in record-aligned chunks, `run` |
 | `src/main.py` | Command-line entry point |
 
@@ -165,7 +165,7 @@ full-data Kaggle run so the analysis and its verdict can be read without re-runn
 | `08_v5.ipynb` | v5 full run: v3 model with both stages in their own processes and hashed blocking keys |
 | `09_v6.ipynb` | v6 full run: sibling stage 2, set selection, France fixes, memory-safe |
 | `10_llm_probe.ipynb` | LLM judge probe: throughput on 2x T4 and zero-shot separation of true pairs vs look-alikes (Phi-3.5-mini vs Qwen2.5-1.5B) |
-| `11_v7_llm.ipynb` | v7: LLM judge on the hardest pairs of a finished run (attached through `kernel_sources`) |
+| `11_v7_llm.ipynb` | v7: twin support + LLM judge on the hardest pairs of a finished v6 run (attached through `kernel_sources`) |
 
 Local setup:
 
